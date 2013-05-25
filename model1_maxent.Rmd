@@ -1,13 +1,13 @@
 Vaje GIS Medvedjak2013
 ========================================================
 
-Najprej aktiviramo pakete. Če ni nameščenih na računalnik, to naredimo z ukazom `install.packages("ime.paketa")`.
+Najprej aktiviramo pakete. Če še niso nameščeni na računalnik, to naredimo z ukazom `install.packages("ime.paketa")`.
 
 ```{r nalaganje_paketov}
-library(knitr) # za poročilo
-library(dismo) # kliče program MaxEnt
-library(rgdal) # za uvoz podatkov
-library(raster) # paket za delo z rastri
+library("knitr") # za poročilo
+library("dismo") # kliče program MaxEnt
+library("rgdal") # za uvoz podatkov
+library("raster") # paket za delo z rastri
 ```
 
 Nastavimo direktorij, kamor smo shranili vse spremenljivke, ki jih bomo uporabili v analizi. To bo isti direktorij, v katerega bo R shranjeval datoteke, ki jih bomo ustvarili mi (npr. rastrsko sliko napovedi modela).
@@ -107,7 +107,7 @@ Na vajah smo rekli, da se sami odločimo kdaj smatramo celico, da predstavlja "u
 
 Pri razumevanju izpisov je lahko v pomoč tudi vinjeta paketa dismo. Odpremo jo z ukazom `vignette("sdm")`.
 
-Ko delamo navzkrižno preverjanje našega modela (v Pearsonovem prispevku glej poglavje kjer omeni "confussion matrix"), del naših podatkov (recimo 10%) ne uporabimo pri izgradnji modela. S preostalimi podatki naredimo model in na podlagi nekega kriterija (glej prejšnji odstavek) vse celice klasificiramo ali pripadajo v skupino ugodnega ali neugodnega habitata. Nato pa pogledamo naše napovedi za tistih 10% točk (celic). Več točk kot napovemo pravilno kot ugodne, da je tam ugoden habitat za volka (in to vemo, da je, ker je bil volk tam prisoten), boljši je naš model.
+Ko delamo navzkrižno preverjanje našega modela (v Pearsonovem prispevku glej poglavje kjer omeni "confussion matrix"), del naših podatkov (recimo 10%) ne uporabimo pri izgradnji modela. S preostalimi podatki naredimo model in na podlagi nekega kriterija (glej prejšnji odstavek) vse celice klasificiramo ali pripadajo v skupino ugodnega ali neugodnega habitata. Nato pa pogledamo naše napovedi za tistih 10% točk (celic). Več točk kot napovemo pravilno, da je tam ugoden habitat za volka (in to vemo, da je, ker je bil volk tam prisoten), boljši je naš model.
 
 ```{r navzkrizno_preverjanje}
 np.maxent <- evaluate(p = volk, a = volk.test, model = mdl.maxent, x = env.data)
