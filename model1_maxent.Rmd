@@ -1,0 +1,127 @@
+Vaje GIS Medvedjak2013
+========================================================
+
+Najprej aktiviramo pakete. Če ni nameščenih na računalnik, to naredimo z ukazom `install.packages("ime.paketa")`.
+
+```{r nalaganje_paketov}
+library(knitr) # za poročilo
+library(dismo) # kliče program MaxEnt
+library(rgdal) # za uvoz podatkov
+library(raster) # paket za delo z rastri
+```
+
+Nastavimo direktorij, kamor smo shranili vse spremenljivke, ki jih bomo uporabili v analizi. To bo isti direktorij, v katerega bo R shranjeval datoteke, ki jih bomo ustvarili mi (npr. rastrsko sliko napovedi modela).
+
+Ta direktorij lahko služi kot vir podatkov za posamezni scenarij.
+
+```{r direktorij_s_scenariji}
+setwd("q:/gis/slo_osnova/medvednjak/model1spremenljivke/")
+```
+
+Iz direktorija uvozimo vse podatke, ki se končajo na `.img` (znak za dolar na koncu stavka pove, da se mora končati z `.img`, drugače lahko prebere tudi datoteke, ki imajo v sredini imena to frazo). Le-te shranimo v objekt tipa `stack`, s katerim bomo računali. Za lažjo predstavo podatkov uvozimo tudi državno mejo.
+
+```{r uvoz_okoljskih_podatkov}
+env.data <- list.files(pattern = ".img$")
+env.data <- stack(sapply(env.data, FUN = raster))
+
+if (file.exists("q:/gis/slo_osnova/RazniSloji/Drzavna_meja.shp")) {
+  meja <- readOGR("q:/gis/slo_osnova/RazniSloji/Drzavna_meja.shp", layer = "Drzavna_meja")
+  } else {
+    warning("Datoteke z državno mejo ni mogoče najti, zato nekaterih slik ne bo mogoče narisati.")
+    }
+```
+
+Pogledamo vse uvožene spremenljivke.
+```{r poglej_okoljske_spremenljivke}
+plot(env.data)
+```
+
+Uvozimo podatke o prisotnosti volka in jih izrišemo na zemljevid Slovenije.
+```{r uvoz_lokacij_volka}
+volk <- readOGR("wolf_slo4.shp", layer = "wolf_slo4")
+
+plot(meja)
+points(volk)
+```
+
+Da bomo lahko preverili naš model, izberemo 90% točk prisotnosti volkov, 10% pa jih shranimo za preverjanje. Slednjih ne uporabimo pri računanju modela.
+
+```{r sample_volk}
+set.seed(357)
+ss <- kfold(volk, 10) # 10% naključno izbranih točk
+volk.test <- volk[ss == 1, ]
+volk <- volk[ss != 1, ] # ostalih 90% vrednosti gre  v model
+```
+
+Imamo pripravljene podatke, ki jih "nahranimo" v model MaxEnt. Proces je računsko zahtevnejši in lahko traja dlje časa, da bo program dokončal.
+
+```{r pozeni_maxent}
+mdl.maxent <- maxent(x = env.data, p = volk)
+```
+
+Pogledamo relativno pomembnost spremenljivk v modelu.
+
+```{r poglej_relativno_pomembnost_spremenljivk_v_modelu}
+plot(mdl.maxent)
+```
+
+Na podlagi našega modela v vseh rastrskih celicah, kjer so prisotne vrednosti (ne pa `NA` oz. `NoData`), izračunamo ustreznost habitata in rezultat narišemo. Modre točke so celice prisotnosti volka, ki smo jih uporabili v modelu.
+
+```{r poglej_napovedane_vrednosti}
+prd.mdl <- predict(env.data, mdl.maxent)
+plot(prd.mdl)
+points(volk, pch = ".", cex = 0.1, col = "blue")
+```
+
+Če bi želeli shraniti rezultat v datoteko, lahko to storimo s spodnjim ukazom. Pri avtomatskem zagonu te datoteke se naslednji košček (chunk) ne zažene, ker smo v naslovu koščka nastavili `eval = FALSE`.
+
+```{r shrani_rezultat_v_datoteko, eval = FALSE}
+png("result_predict_model1.png", width = 10, height = 10) # velikost je v colah
+plot(prd.mdl)
+dev.off()
+```
+
+Rezultat lahko zapišemo v npr. GTiff datoteko. Za ostale formate, v katere je možni pisati, si poglej v `?writeformats`.
+
+```{r zapisi_kot_georeferencirano_datoteko, eval = FALSE}
+writeRaster(prd.mdl, filename ="predikcija_model1", format = "GTiff" )
+```
+
+Pogledamo korelacijo med spremenljivkami.
+
+```{r preveri_korelacijo_med_spremenljivkami}
+set.seed(357)
+N <- 1000 # velikost podvzorca
+calc.cor <- matrix(rep(NA, N * nlayers(env.data)), ncol = nlayers(env.data))
+dis2for1 <- sample(env.data[["dis2for1.img"]][], N)
+
+for (i in 1:nlayers(env.data)) {
+  calc.cor[, i] <- sample(env.data[[i]][], N)
+  }
+
+pairs(calc.cor)
+```
+
+Preverimo tudi kako dobre napovedi daje naš model.
+Na vajah smo rekli, da se sami odločimo kdaj smatramo celico, da predstavlja "ugoden habitat" (oz. kdaj si dovolj zanesljiv, da dobiš posojilo). To je lahko že recimo pri vrednosti 0.2, ali pa šele pri 0.8. Celice, ki jih smatramo, da predstavljajo ugoden habitat označimo z 1, ostale pa z 0. Katero vrednost izberemo pa je predmet raziskav. Nekaj več o tem piše Richard G. Pearson v [Species' distribution modelign for conservation educators and practitioners](http://biodiversityinformatics.amnh.org/files/SpeciesDistModelingSYN_1-16-08.pdf). Naštudiraj katero mero se izbere za določitev optimalne mejne vrednosti, ki jo še smatramo za vrednost, da je celica OK habitat.
+
+Pri razumevanju izpisov je lahko v pomoč tudi vinjeta paketa dismo. Odpremo jo z ukazom `vignette("sdm")`.
+
+Ko delamo navzkrižno preverjanje našega modela (v Pearsonovem prispevku glej poglavje kjer omeni "confussion matrix"), del naših podatkov (recimo 10%) ne uporabimo pri izgradnji modela. S preostalimi podatki naredimo model in na podlagi nekega kriterija (glej prejšnji odstavek) vse celice klasificiramo ali pripadajo v skupino ugodnega ali neugodnega habitata. Nato pa pogledamo naše napovedi za tistih 10% točk (celic). Več točk kot napovemo pravilno kot ugodne, da je tam ugoden habitat za volka (in to vemo, da je, ker je bil volk tam prisoten), boljši je naš model.
+
+```{r navzkrizno_preverjanje}
+np.maxent <- evaluate(p = volk, a = volk.test, model = mdl.maxent, x = env.data)
+np.maxent
+```
+
+Pogledamo si lahko tudi, kako se napovedne vrednosti modela speminjajo glede na posamezno okoljsko spremenljivko.
+
+```{r prikaz_modelnih_spremenljiv}
+response(mdl.maxent)
+```
+
+Kako dobro deluje model lahko preverimo tudi z ROC (ali AUC) prikazom. Več o tem prikazu piše Pearson.
+
+```{r roc_plot}
+plot(np.maxent, "ROC")
+```
