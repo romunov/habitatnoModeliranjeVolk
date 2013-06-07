@@ -161,3 +161,18 @@ pip-log.txt
 
 # Mac crap
 .DS_Store
+*.png
+*.pdf
+*.img
+*.rrd
+*.dbf
+*.html
+*.md
+*.asc
+*.xml
+predikcija_model1.tif
+*.prj
+*.sbn
+*.sbx
+*.shp
+*.shx
